@@ -1,0 +1,57 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    height: 100%;
+    font-family: Arial, sans-serif;
+}
+
+#gameArea {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background-color: #f0f0f0;
+}
+
+#character {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    background-color: #444;
+    border-radius: 50%;
+    top: 50%;
+    left: 50px;
+    transform: translateY(-50%);
+}
+
+#score {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 24px;
+    color: #333;
+}
+
+.projectile {
+    position: absolute;
+    background-color: #f00;
+}
+
+.projectile.large {
+    width: 40px;
+    height: 20px;
+    background-color: blue;
+}
+
+.projectile.small {
+    width: 20px;
+    height: 10px;
+    background-color: red;
+}
+
+.projectile.coin {
+    width: 10px;
+    height: 10px;
+    background-color: gold;
+    border-radius: 50%;
+}
