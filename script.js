@@ -37,7 +37,7 @@ function preload() {
 function create() {
     this.add.tileSprite(0, 0, this.sys.game.config.width, this.sys.game.config.height, 'background').setOrigin(0, 0);
 
-    character = this.physics.add.sprite(400, 300, 'character').setScale(0.);
+    character = this.physics.add.sprite(400, 300, 'character').setScale(0.1);
     character.setCollideWorldBounds(true);
 
     projectiles = this.physics.add.group();
