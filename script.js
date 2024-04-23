@@ -32,13 +32,12 @@ function preload() {
     this.load.image('character', 'SpaceShip.png');
     this.load.image('projectileSmall', 'Asteroid.png');
     this.load.image('laser', 'Laser.png');
-    this.load.spritesheet('explosion', 'explosion.png', { frameWidth: 64, frameHeight: 64 });
 }
 
 function create() {
     this.add.tileSprite(0, 0, this.sys.game.config.width, this.sys.game.config.height, 'background').setOrigin(0, 0);
 
-    character = this.physics.add.sprite(400, 300, 'character').setScale(0.1);
+    character = this.physics.add.sprite(400, 300, 'character').setScale(0.);
     character.setCollideWorldBounds(true);
 
     projectiles = this.physics.add.group();
@@ -53,13 +52,6 @@ function create() {
         space: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
     };
     cursors = Object.assign(cursors, wasd);
-
-    this.anims.create({
-        key: 'explode',
-        frames: this.anims.generateFrameNumbers('explosion', { start: 0, end: 15 }),
-        frameRate: 20,
-        hideOnComplete: true
-    });
 
     scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff' });
 
@@ -103,6 +95,16 @@ function update() {
     }
 }
 
+function createProjectile() {
+    const y = Phaser.Math.Between(0, this.sys.game.config.height);
+    let projectile = projectiles.create(800, y, 'projectileSmall').setScale(0.3);
+    projectile.setVelocityX(-Phaser.Math.Between(100, 200));
+    projectile.setAngularVelocity(20);
+
+    this.physics.add.collider(character, projectile, handleCollision, null, this);
+    this.physics.add.collider(lasers, projectile, destroyProjectile, null, this);
+}
+
 function handleCollision(character, projectile) {
     gameRunning = false;
     this.physics.pause();
@@ -117,9 +119,6 @@ function shootLaser() {
 }
 
 function destroyProjectile(laser, projectile) {
-    let explosion = this.physics.add.sprite(projectile.x, projectile.y, 'explosion');
-    explosion.play('explode');
-
     projectile.destroy();
     laser.destroy();
     score += 100;
