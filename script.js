@@ -17,7 +17,7 @@ const config = {
     }
 };
 
-let character;
+let character, glow; // Include glow in the global scope
 let score = 0;
 let scoreText;
 let lives = 3;
@@ -25,9 +25,7 @@ let hearts;
 let gameRunning = true;
 let projectiles;
 let lasers;
-let burstShots;
 let cursors;
-let shiftKey;
 let lastFired = 0;
 let fireRate = 500;
 let asteroidTimer;
@@ -43,13 +41,13 @@ function preload() {
 function create() {
     this.add.tileSprite(0, 0, this.sys.game.config.width, this.sys.game.config.height, 'background').setOrigin(0, 0);
 
+    // Initialize the glow first so it's under the spaceship
+    glow = this.add.sprite(400, 300, 'character').setScale(0.6);
+    glow.setTint(0xffff99); // Apply a light yellow tint
+    glow.setAlpha(0.5); // Semi-transparent to appear as a glow
+
     lasers = this.physics.add.group({
         classType: Phaser.Physics.Arcade.Image
-    });
-
-    burstShots = this.physics.add.group({
-        classType: Phaser.Physics.Arcade.Image,
-        maxSize: 30 // Allows for some off-screen management
     });
 
     character = this.physics.add.sprite(400, 300, 'character').setScale(0.5);
@@ -61,7 +59,14 @@ function create() {
     });
 
     cursors = this.input.keyboard.createCursorKeys();
-    shiftKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    let wasd = {
+        up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+        down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+        left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+        right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+        space: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
+    };
+    cursors = Object.assign(cursors, wasd);
 
     scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff' });
 
@@ -91,7 +96,10 @@ function update() {
         return;
     }
 
-    handlePlayerMovement();
+    // Update the position and rotation of the glow to match the spaceship
+    glow.x = character.x;
+    glow.y = character.y;
+    glow.rotation = character.rotation;
 
     projectiles.getChildren().forEach(projectile => {
         if (projectile.x < 0) {
@@ -99,17 +107,6 @@ function update() {
         }
     });
 
-    if (Phaser.Input.Keyboard.JustDown(shiftKey)) {
-        shootBurst();
-    }
-
-    if (Phaser.Input.Keyboard.JustDown(cursors.space) && this.time.now > lastFired + fireRate) {
-        shootLaser();
-        lastFired = this.time.now + fireRate;
-    }
-}
-
-function handlePlayerMovement() {
     character.setVelocity(0);
 
     if (cursors.left.isDown) {
@@ -127,6 +124,47 @@ function handlePlayerMovement() {
     } else {
         character.setRotation(0);
     }
+
+    let time = this.time.now;
+    if (Phaser.Input.Keyboard.JustDown(cursors.space) && time > lastFired + fireRate) {
+        shootLaser();
+        lastFired = time;
+    }
+}
+
+function createProjectile() {
+    const y = Phaser.Math.Between(0, this.sys.game.config.height);
+    let projectile = projectiles.create(800, y, 'projectileSmall').setScale(0.3);
+    projectile.setVelocityX(-Phaser.Math.Between(100, 200));
+    projectile.setAngularVelocity(20);
+
+    this.physics.add.collider(character, projectile, handleCollision, null, this);
+    this.physics.add.collider(lasers, projectile, destroyProjectile, null, this);
+}
+
+function handleCollision(character, projectile) {
+    this.cameras.main.shake(250, 0.01);
+    character.setTint(0xff0000);
+
+    this.time.delayedCall(500, () => {
+        character.clearTint();
+    }, [], this);
+
+    projectile.destroy();
+    lives -= 1;
+    updateHearts();
+    if (lives <= 0) {
+        gameRunning = false;
+        this.physics.pause();
+        character.setTint(0xff0000);
+        scoreText.setText(`Game Over! Your score was: ${score}`);
+    }
+}
+
+function updateHearts() {
+    hearts.children.each((heart, index) => {
+        heart.setVisible(index < lives);
+    });
 }
 
 function shootLaser() {
@@ -135,54 +173,26 @@ function shootLaser() {
     laser.setScale(0.25);
 }
 
-function shootBurst() {
-    let angles = [-15, 0, 15]; // Angles for the three shots
-    angles.forEach(angle => {
-        let burst = burstShots.get(character.x, character.y, 'laser');
-        if (burst) {
-            burst.setActive(true).setVisible(true);
-            burst.setScale(0.5);
-            burst.setRotation(Phaser.Math.DegToRad(angle));
-            this.physics.velocityFromAngle(angle - 90, 400, burst.body.velocity);
-        }
-    });
-}
-
-function createProjectile() {
-    const y = Phaser.Math.Between(0, this.sys.game.config.height);
-    let projectile = projectiles.create(800, y, 'projectileSmall').setScale(0.3);
-    projectile.setVelocityX(-Phaser.Math.Between(100, 200));
-    this.physics.add.collider(character, projectile, handleCollision, null, this);
-    this.physics.add.collider(lasers, projectile, destroyProjectile, null, this);
-    this.physics.add.collider(burstShots, projectile, destroyProjectile, null, this);
-}
-
-function handleCollision(character, projectile) {
-    this.cameras.main.shake(250, 0.01);
-    character.setTint(0xff0000);
-    this.time.delayedCall(500, () => character.clearTint(), [], this);
-    projectile.destroy();
-    lives--;
-    updateHearts();
-    if (lives <= 0) gameOver();
-}
-
 function destroyProjectile(laser, projectile) {
+    if (projectile.scaleX === 0.3) {  // Check if it's a large asteroid
+        splitAsteroid(projectile);
+    } else {
+        projectile.destroy();
+    }
     laser.destroy();
-    projectile.destroy();
     score += 100;
     scoreText.setText(`Score: ${score}`);
 }
 
-function updateHearts() {
-    hearts.children.each((heart, index) => heart.setVisible(index < lives));
-}
-
-function gameOver() {
-    gameRunning = false;
-    this.physics.pause();
-    character.setTint(0xff0000);
-    scoreText.setText(`Game Over! Your score was: ${score}`);
+function splitAsteroid(asteroid) {
+    for (let i = 0; i < 2; i++) {
+        let smallAsteroid = projectiles.create(asteroid.x, asteroid.y, 'projectileSmall');
+        smallAsteroid.setScale(0.15);
+        const angle = Phaser.Math.Between(-90, 90);
+        this.physics.velocityFromAngle(angle, Phaser.Math.Between(150, 250), smallAsteroid.body.velocity);
+        smallAsteroid.setAngularVelocity(50);
+    }
+    asteroid.destroy();
 }
 
 new Phaser.Game(config);
