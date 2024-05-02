@@ -25,13 +25,12 @@ let hearts;
 let gameRunning = true;
 let projectiles;
 let lasers;
+let burstShots;
 let cursors;
+let shiftKey;
 let lastFired = 0;
 let fireRate = 500;
 let asteroidTimer;
-let difficultyFactor = 1;
-let initialAsteroidDelay = 800;
-let initialAsteroidSpeed = 200;
 
 function preload() {
     this.load.image('background', 'https://labs.phaser.io/assets/skies/starfield.png');
@@ -48,6 +47,11 @@ function create() {
         classType: Phaser.Physics.Arcade.Image
     });
 
+    burstShots = this.physics.add.group({
+        classType: Phaser.Physics.Arcade.Image,
+        maxSize: 30 // Allows for some off-screen management
+    });
+
     character = this.physics.add.sprite(400, 300, 'character').setScale(0.5);
     character.setCollideWorldBounds(true);
     character.setDepth(1);
@@ -57,6 +61,8 @@ function create() {
     });
 
     cursors = this.input.keyboard.createCursorKeys();
+    shiftKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+
     scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff' });
 
     hearts = this.add.group({
@@ -70,12 +76,8 @@ function create() {
         heart.setScale(0.25);
     });
 
-    setupAsteroidTimer();
-}
-
-function setupAsteroidTimer() {
     asteroidTimer = this.time.addEvent({
-        delay: initialAsteroidDelay / difficultyFactor, // Use difficulty factor to adjust delay
+        delay: 800,
         callback: createProjectile,
         callbackScope: this,
         loop: true
@@ -90,70 +92,97 @@ function update() {
     }
 
     handlePlayerMovement();
-    handleShooting();
 
-    // Increase difficulty over time
-    difficultyFactor += 0.001;
-    asteroidTimer.delay = Math.max(100, initialAsteroidDelay / difficultyFactor); // Ensure delay doesn't go below 100 ms
+    projectiles.getChildren().forEach(projectile => {
+        if (projectile.x < 0) {
+            projectile.destroy();
+        }
+    });
+
+    if (Phaser.Input.Keyboard.JustDown(shiftKey)) {
+        shootBurst();
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(cursors.space) && this.time.now > lastFired + fireRate) {
+        shootLaser();
+        lastFired = this.time.now + fireRate;
+    }
+}
+
+function handlePlayerMovement() {
+    character.setVelocity(0);
+
+    if (cursors.left.isDown) {
+        character.setVelocityX(-250);
+    } else if (cursors.right.isDown) {
+        character.setVelocityX(250);
+    }
+
+    if (cursors.up.isDown) {
+        character.setVelocityY(-250);
+        character.setRotation(-0.2);
+    } else if (cursors.down.isDown) {
+        character.setVelocityY(250);
+        character.setRotation(0.2);
+    } else {
+        character.setRotation(0);
+    }
+}
+
+function shootLaser() {
+    let laser = lasers.create(character.x, character.y, 'laser');
+    laser.setVelocityX(300);
+    laser.setScale(0.25);
+}
+
+function shootBurst() {
+    let angles = [-15, 0, 15]; // Angles for the three shots
+    angles.forEach(angle => {
+        let burst = burstShots.get(character.x, character.y, 'laser');
+        if (burst) {
+            burst.setActive(true).setVisible(true);
+            burst.setScale(0.5);
+            burst.setRotation(Phaser.Math.DegToRad(angle));
+            this.physics.velocityFromAngle(angle - 90, 400, burst.body.velocity);
+        }
+    });
 }
 
 function createProjectile() {
     const y = Phaser.Math.Between(0, this.sys.game.config.height);
     let projectile = projectiles.create(800, y, 'projectileSmall').setScale(0.3);
-    projectile.setVelocityX(-Phaser.Math.Between(100, 100 + 100 * difficultyFactor)); // Increase speed based on difficulty
+    projectile.setVelocityX(-Phaser.Math.Between(100, 200));
     this.physics.add.collider(character, projectile, handleCollision, null, this);
     this.physics.add.collider(lasers, projectile, destroyProjectile, null, this);
+    this.physics.add.collider(burstShots, projectile, destroyProjectile, null, this);
 }
 
 function handleCollision(character, projectile) {
     this.cameras.main.shake(250, 0.01);
     character.setTint(0xff0000);
-
-    this.time.delayedCall(500, () => {
-        character.clearTint();
-    });
-
+    this.time.delayedCall(500, () => character.clearTint(), [], this);
     projectile.destroy();
-    lives -= 1;
+    lives--;
     updateHearts();
-    if (lives <= 0) {
-        gameRunning = false;
-        this.physics.pause();
-        character.setTint(0xff0000);
-        scoreText.setText(`Game Over! Your score was: ${score}`);
-    }
-}
-
-function updateHearts() {
-    hearts.children.each((heart, index) => {
-        heart.setVisible(index < lives);
-    });
-}
-
-function handlePlayerMovement() {
-    character.setVelocity(0);
-    if (cursors.left.isDown) character.setVelocityX(-250);
-    else if (cursors.right.isDown) character.setVelocityX(250);
-    if (cursors.up.isDown) character.setVelocityY(-250);
-    else if (cursors.down.isDown) character.setVelocityY(250);
-    character.setRotation(0); // Reset rotation when not moving up or down
-}
-
-function shootLaser() {
-    let time = this.time.now;
-    if (Phaser.Input.Keyboard.JustDown(cursors.space) && time > lastFired + fireRate) {
-        let laser = lasers.create(character.x, character.y, 'laser');
-        laser.setVelocityX(300);
-        laser.setScale(0.25);
-        lastFired = time + fireRate;
-    }
+    if (lives <= 0) gameOver();
 }
 
 function destroyProjectile(laser, projectile) {
-    projectile.destroy();
     laser.destroy();
+    projectile.destroy();
     score += 100;
     scoreText.setText(`Score: ${score}`);
+}
+
+function updateHearts() {
+    hearts.children.each((heart, index) => heart.setVisible(index < lives));
+}
+
+function gameOver() {
+    gameRunning = false;
+    this.physics.pause();
+    character.setTint(0xff0000);
+    scoreText.setText(`Game Over! Your score was: ${score}`);
 }
 
 new Phaser.Game(config);
