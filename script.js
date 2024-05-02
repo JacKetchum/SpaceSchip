@@ -17,7 +17,7 @@ const config = {
     }
 };
 
-let character, glow; // Include glow in the global scope
+let character, glow, laserSight; // Include the glow and laser sight
 let score = 0;
 let scoreText;
 let lives = 3;
@@ -41,10 +41,9 @@ function preload() {
 function create() {
     this.add.tileSprite(0, 0, this.sys.game.config.width, this.sys.game.config.height, 'background').setOrigin(0, 0);
 
-    // Initialize the glow first so it's under the spaceship
-    glow = this.add.sprite(400, 300, 'character').setScale(0.6);
-    glow.setTint(0xffff99); // Apply a light yellow tint
-    glow.setAlpha(0.5); // Semi-transparent to appear as a glow
+    glow = this.add.sprite(400, 300, 'character').setScale(0.55);
+    glow.setTint(0xffff99);
+    glow.setAlpha(0.4);
 
     lasers = this.physics.add.group({
         classType: Phaser.Physics.Arcade.Image
@@ -87,6 +86,8 @@ function create() {
         callbackScope: this,
         loop: true
     });
+
+    laserSight = this.add.graphics({ lineStyle: { width: 2, color: 0xff0000, alpha: 0.5 } });
 }
 
 function update() {
@@ -96,11 +97,6 @@ function update() {
         return;
     }
 
-    // Update the position and rotation of the glow to match the spaceship
-    glow.x = character.x;
-    glow.y = character.y;
-    glow.rotation = character.rotation;
-
     projectiles.getChildren().forEach(projectile => {
         if (projectile.x < 0) {
             projectile.destroy();
@@ -108,6 +104,9 @@ function update() {
     });
 
     character.setVelocity(0);
+    glow.x = character.x;
+    glow.y = character.y;
+    glow.rotation = character.rotation;
 
     if (cursors.left.isDown) {
         character.setVelocityX(-250);
@@ -130,6 +129,18 @@ function update() {
         shootLaser();
         lastFired = time;
     }
+
+    // Update laser sight
+    laserSight.clear();
+    laserSight.strokeLineShape(new Phaser.Geom.Line(character.x, character.y, character.x + 800 * Math.cos(character.rotation), character.y + 800 * Math.sin(character.rotation)));
+}
+
+function shootLaser() {
+    let laser = lasers.create(character.x, character.y, 'laser');
+    laser.body.velocity.x = 300 * Math.cos(character.rotation); // Calculate the correct velocity based on rotation
+    laser.body.velocity.y = 300 * Math.sin(character.rotation);
+    laser.setScale(0.25);
+    laser.rotation = character.rotation; // Align laser with the ship's rotation
 }
 
 function createProjectile() {
@@ -165,12 +176,6 @@ function updateHearts() {
     hearts.children.each((heart, index) => {
         heart.setVisible(index < lives);
     });
-}
-
-function shootLaser() {
-    let laser = lasers.create(character.x, character.y, 'laser');
-    laser.setVelocityX(300);
-    laser.setScale(0.25);
 }
 
 function destroyProjectile(laser, projectile) {
