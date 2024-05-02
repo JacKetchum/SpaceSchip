@@ -20,19 +20,15 @@ const config = {
 let character;
 let score = 0;
 let scoreText;
-let lives = 3; 
-let hearts; 
+let lives = 3;
+let hearts;
 let gameRunning = true;
 let projectiles;
 let lasers;
 let cursors;
 let lastFired = 0;
 let fireRate = 500;
-let asteroidTimer; 
-let thrustBar;
-let maxThrust = 100;
-let currentThrust = 100;
-let thrustKey;
+let asteroidTimer;
 
 function preload() {
     this.load.image('background', 'https://labs.phaser.io/assets/skies/starfield.png');
@@ -40,7 +36,6 @@ function preload() {
     this.load.image('projectileSmall', 'Asteroid.png');
     this.load.image('laser', 'Laser.png');
     this.load.image('heart', 'heart.png');
-    this.load.image('thrustBar', 'bar.png');  // Assume a plain horizontal bar graphic
 }
 
 function create() {
@@ -59,7 +54,14 @@ function create() {
     });
 
     cursors = this.input.keyboard.createCursorKeys();
-    thrustKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    let wasd = {
+        up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+        down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+        left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+        right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+        space: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
+    };
+    cursors = Object.assign(cursors, wasd);
 
     scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff' });
 
@@ -71,13 +73,8 @@ function create() {
     });
 
     hearts.children.iterate(function (heart) {
-        heart.setScale(0.25); 
+        heart.setScale(0.25);
     });
-
-    // Create a thrust meter
-    thrustBar = this.add.graphics();
-    thrustBar.fillStyle(0x00ff00, 1);
-    thrustBar.fillRect(16, 100, 200, 20);  // Starting full width
 
     asteroidTimer = this.time.addEvent({
         delay: 800,
@@ -89,8 +86,8 @@ function create() {
 
 function update() {
     if (!gameRunning) {
-        projectiles.getChildren().forEach(projectile => projectile.destroy()); 
-        asteroidTimer.remove(); 
+        projectiles.getChildren().forEach(projectile => projectile.destroy());
+        asteroidTimer.remove();
         return;
     }
 
@@ -110,16 +107,12 @@ function update() {
 
     if (cursors.up.isDown) {
         character.setVelocityY(-250);
+        character.setRotation(-0.2);
     } else if (cursors.down.isDown) {
         character.setVelocityY(250);
-    }
-
-    if (thrustKey.isDown && currentThrust > 0) {
-        currentThrust -= 0.5;  // Decrease thrust when SHIFT is pressed
-        updateThrustBar();
+        character.setRotation(0.2);
     } else {
-        currentThrust = Math.min(maxThrust, currentThrust + 0.2);  // Recharge thrust when not used
-        updateThrustBar();
+        character.setRotation(0);
     }
 
     let time = this.time.now;
@@ -129,19 +122,22 @@ function update() {
     }
 }
 
-function updateThrustBar() {
-    thrustBar.clear();
-    thrustBar.fillStyle(0x00ff00, 1);
-    thrustBar.fillRect(16, 100, 200 * (currentThrust / maxThrust), 20);
+function createProjectile() {
+    const y = Phaser.Math.Between(0, this.sys.game.config.height);
+    let projectile = projectiles.create(800, y, 'projectileSmall').setScale(0.3);
+    projectile.setVelocityX(-Phaser.Math.Between(100, 200));
+    projectile.setAngularVelocity(20);
+
+    this.physics.add.collider(character, projectile, handleCollision, null, this);
+    this.physics.add.collider(lasers, projectile, destroyProjectile, null, this);
 }
 
 function handleCollision(character, projectile) {
-    this.cameras.main.shake(250, 0.01); 
-    character.setTint(0xff0000); 
+    this.cameras.main.shake(250, 0.01);
+    character.setTint(0xff0000);
 
     this.time.delayedCall(500, function() {
-        character.clearTint();
-        character.setTint(0x8888ff); 
+        character.clearTint(); // Only reset to no tint, removing the blue tint application
     }, [], this);
 
     projectile.destroy();
@@ -153,6 +149,12 @@ function handleCollision(character, projectile) {
         character.setTint(0xff0000);
         scoreText.setText(`Game Over! Your score was: ${score}`);
     }
+}
+
+function updateHearts() {
+    hearts.children.each((heart, index) => {
+        heart.setVisible(index < lives);
+    });
 }
 
 function shootLaser() {
