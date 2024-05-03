@@ -45,7 +45,7 @@ function create() {
         classType: Phaser.Physics.Arcade.Image
     });
 
-    character = this.physics.add.sprite(400, 300, 'character').setScale(0.5);
+    character = this.physics.add.sprite(400, 300, 'character').setScale(0.25);
     character.setCollideWorldBounds(true);
     character.setDepth(1);
 
@@ -172,7 +172,7 @@ function updateHearts() {
 }
 
 function destroyProjectile(laser, projectile) {
-    if (projectile.scaleX === 0.3) {  // Check if it's a large asteroid
+    if (projectile.scaleX === 0.35) {  // Check if it's a large asteroid
         splitAsteroid(projectile);
     } else {
         projectile.destroy();
