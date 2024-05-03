@@ -17,7 +17,7 @@ const config = {
     }
 };
 
-let character, glow, laserSight; // Include the glow and laser sight
+let character, laserSight; // Removed glow from global scope
 let score = 0;
 let scoreText;
 let lives = 3;
@@ -40,10 +40,6 @@ function preload() {
 
 function create() {
     this.add.tileSprite(0, 0, this.sys.game.config.width, this.sys.game.config.height, 'background').setOrigin(0, 0);
-
-    glow = this.add.sprite(400, 300, 'character').setScale(0.55);
-    glow.setTint(0xffff99);
-    glow.setAlpha(0.4);
 
     lasers = this.physics.add.group({
         classType: Phaser.Physics.Arcade.Image
@@ -104,9 +100,6 @@ function update() {
     });
 
     character.setVelocity(0);
-    glow.x = character.x;
-    glow.y = character.y;
-    glow.rotation = character.rotation;
 
     if (cursors.left.isDown) {
         character.setVelocityX(-250);
@@ -137,7 +130,7 @@ function update() {
 
 function shootLaser() {
     let laser = lasers.create(character.x, character.y, 'laser');
-    laser.body.velocity.x = 300 * Math.cos(character.rotation); // Calculate the correct velocity based on rotation
+    laser.body.velocity.x = 300 * Math.cos(character.rotation);
     laser.body.velocity.y = 300 * Math.sin(character.rotation);
     laser.setScale(0.25);
     laser.rotation = character.rotation; // Align laser with the ship's rotation
@@ -146,7 +139,7 @@ function shootLaser() {
 function createProjectile() {
     const y = Phaser.Math.Between(0, this.sys.game.config.height);
     let projectile = projectiles.create(800, y, 'projectileSmall').setScale(0.3);
-    projectile.setVelocityX(-Phaser.Math.Between(100, 200));
+    projectile.setVelocityX(-Phaser.Math.Between(50, 150)); // Slowed down the average speed
     projectile.setAngularVelocity(20);
 
     this.physics.add.collider(character, projectile, handleCollision, null, this);
